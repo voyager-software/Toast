@@ -97,6 +97,16 @@ public final class Toast: UIView {
     }()
 
     private let effectView: UIVisualEffectView = {
+        let effect = if #available(iOS 26, tvOS 26, *) {
+            UIGlassEffect(style: .regular)
+        }
+        else {
+            #if os(iOS)
+            UIBlurEffect(style: .systemMaterial)
+            #else
+            UIBlurEffect(style: .prominent)
+            #endif
+        }
         let ev = UIVisualEffectView(effect: UIBlurEffect(style: .prominent))
         ev.translatesAutoresizingMaskIntoConstraints = false
         return ev
