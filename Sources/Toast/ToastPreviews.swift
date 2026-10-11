@@ -64,9 +64,8 @@ private struct ToastPreviewWrapper: UIViewRepresentable {
         ])
 
         // Animate the toast in
-        toast.alpha = 0
         UIView.animate(withDuration: 0.3) {
-            toast.alpha = 1
+            toast.setVisible(true)
         }
 
         return container

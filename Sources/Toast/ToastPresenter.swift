@@ -122,13 +122,13 @@ public extension Toast {
         // When anchored to tab bar's top, the constraint doesn't need updating
         // The tab bar's frame change will automatically reposition the toast
         // We just need to ensure the layout updates
-        if self.isAnchoredToTabBar, self.alpha > 0 {
+        if self.isAnchoredToTabBar, self.isVisible {
             self.superview?.layoutIfNeeded()
         }
     }
 
     private func animationsForShow() {
-        self.alpha = 1
+        self.setVisible(true)
         guard let position = self.position else { return }
 
         switch position {
@@ -142,7 +142,7 @@ public extension Toast {
     }
 
     private func animationsForHide() {
-        self.alpha = 0
+        self.setVisible(false)
         guard let position = self.position else { return }
 
         switch position {

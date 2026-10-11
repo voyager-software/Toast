@@ -39,20 +39,14 @@ public final class Toast: UIView {
     }
 
     public var color: UIColor? {
-        get {
-            if #available(iOS 26, tvOS 26, *), let glass = self.effectView.effect as? UIGlassEffect {
-                return glass.tintColor
-            }
-            return self.effectView.backgroundColor
-        }
-        set {
+        didSet {
             if #available(iOS 26, tvOS 26, *) {
-                let glass = UIGlassEffect(style: .regular)
-                glass.tintColor = newValue
-                self.effectView.effect = glass
+                if self.isVisible {
+                    self.effectView.effect = self.makeGlassEffect()
+                }
             }
             else {
-                self.effectView.backgroundColor = newValue
+                self.effectView.backgroundColor = self.color
             }
         }
     }
@@ -78,6 +72,24 @@ public final class Toast: UIView {
     var regularConstraints: [NSLayoutConstraint] = []
     var position: Position?
     var isAnchoredToTabBar = false
+    private(set) var isVisible = false
+
+    /// Shows or hides the toast; call inside an animation block to animate.
+    ///
+    /// On iOS/tvOS 26+ the glass materializes by animating its effect, because fading
+    /// the alpha of a glass view (or any of its superviews) renders it incorrectly.
+    func setVisible(_ visible: Bool) {
+        self.isVisible = visible
+        self.isUserInteractionEnabled = visible
+
+        if #available(iOS 26, tvOS 26, *) {
+            self.effectView.effect = visible ? self.makeGlassEffect() : nil
+            self.stackView.alpha = visible ? 1 : 0
+        }
+        else {
+            self.alpha = visible ? 1 : 0
+        }
+    }
 
     func updateConstraintsForCurrentSizeClass() {
         NSLayoutConstraint.deactivate(self.compactConstraints + self.regularConstraints)
@@ -109,7 +121,8 @@ public final class Toast: UIView {
     private let effectView: UIVisualEffectView = {
         let ev: UIVisualEffectView
         if #available(iOS 26, tvOS 26, *) {
-            ev = UIVisualEffectView(effect: UIGlassEffect(style: .regular))
+            // Starts without an effect; `setVisible(_:)` materializes the glass.
+            ev = UIVisualEffectView(effect: nil)
             ev.cornerConfiguration = .capsule(maximumRadius: 23)
         }
         else {
@@ -167,6 +180,14 @@ public final class Toast: UIView {
         return ai
     }()
 
+    @available(iOS 26, tvOS 26, *)
+    private func makeGlassEffect() -> UIGlassEffect {
+        let glass = UIGlassEffect(style: .regular)
+        glass.tintColor = self.color
+        glass.isInteractive = true
+        return glass
+    }
+
     @objc private func tapHandler() {
         self.hide()
     }
@@ -202,6 +223,8 @@ public final class Toast: UIView {
             self.contentView.addSubview(self.effectView)
             self.contentView.addSubview(self.stackView)
             self.contentView.backgroundColor = .clear
+            // `didSet` doesn't fire for the assignment in `init`.
+            self.effectView.backgroundColor = self.color
             container = self.contentView
 
             NSLayoutConstraint.activate([
@@ -224,7 +247,7 @@ public final class Toast: UIView {
             self.stackView.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -10),
         ])
 
-        self.alpha = 0
+        self.setVisible(false)
 
         self.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.tapHandler)))
     }
