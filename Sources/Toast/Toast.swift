@@ -39,8 +39,22 @@ public final class Toast: UIView {
     }
 
     public var color: UIColor? {
-        get { self.effectView.backgroundColor }
-        set { self.effectView.backgroundColor = newValue }
+        get {
+            if #available(iOS 26, tvOS 26, *), let glass = self.effectView.effect as? UIGlassEffect {
+                return glass.tintColor
+            }
+            return self.effectView.backgroundColor
+        }
+        set {
+            if #available(iOS 26, tvOS 26, *) {
+                let glass = UIGlassEffect(style: .regular)
+                glass.tintColor = newValue
+                self.effectView.effect = glass
+            }
+            else {
+                self.effectView.backgroundColor = newValue
+            }
+        }
     }
 
     override public func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
@@ -80,15 +94,11 @@ public final class Toast: UIView {
 
     private static let spinnerSize: CGFloat = 20
 
-    private let contentView: UIView = {
+    /// Clipping wrapper for the pre-iOS 26 blur; unused with native glass.
+    private lazy var contentView: UIView = {
         let view = UIView()
         view.translatesAutoresizingMaskIntoConstraints = false
-        if #available(iOS 26, tvOS 26, *) {
-            view.layer.cornerRadius = 23
-        }
-        else {
-            view.layer.cornerRadius = 12
-        }
+        view.layer.cornerRadius = 12
         view.layer.cornerCurve = .continuous
         view.layer.borderColor = UIColor.systemGray.withAlphaComponent(0.25).cgColor
         view.layer.borderWidth = 1.0
@@ -97,17 +107,18 @@ public final class Toast: UIView {
     }()
 
     private let effectView: UIVisualEffectView = {
-        let effect = if #available(iOS 26, tvOS 26, *) {
-            UIGlassEffect(style: .regular)
+        let ev: UIVisualEffectView
+        if #available(iOS 26, tvOS 26, *) {
+            ev = UIVisualEffectView(effect: UIGlassEffect(style: .regular))
+            ev.cornerConfiguration = .capsule(maximumRadius: 23)
         }
         else {
             #if os(iOS)
-            UIBlurEffect(style: .systemMaterial)
+            ev = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
             #else
-            UIBlurEffect(style: .prominent)
+            ev = UIVisualEffectView(effect: UIBlurEffect(style: .prominent))
             #endif
         }
-        let ev = UIVisualEffectView(effect: UIBlurEffect(style: .prominent))
         ev.translatesAutoresizingMaskIntoConstraints = false
         return ev
     }()
@@ -162,16 +173,7 @@ public final class Toast: UIView {
 
     private func setup(imageName: String, withSpinner: Bool) {
         self.translatesAutoresizingMaskIntoConstraints = false
-
         self.layer.backgroundColor = UIColor.clear.cgColor
-        self.layer.shadowColor = UIColor.black.cgColor
-        self.layer.shadowOffset = .zero
-        self.layer.shadowOpacity = 0.25
-        self.layer.shadowRadius = 20
-
-        self.addSubview(self.contentView)
-        self.contentView.addSubview(self.effectView)
-        self.contentView.addSubview(self.stackView)
 
         self.imageView.image = UIImage(systemName: imageName)
 
@@ -183,25 +185,46 @@ public final class Toast: UIView {
             self.spinner.startAnimating()
         }
 
+        let container: UIView
+        if #available(iOS 26, tvOS 26, *) {
+            // Native glass: corners come from `cornerConfiguration` and the glass renders its own shadow.
+            self.addSubview(self.effectView)
+            self.effectView.contentView.addSubview(self.stackView)
+            container = self.effectView
+        }
+        else {
+            self.layer.shadowColor = UIColor.black.cgColor
+            self.layer.shadowOffset = .zero
+            self.layer.shadowOpacity = 0.25
+            self.layer.shadowRadius = 20
+
+            self.addSubview(self.contentView)
+            self.contentView.addSubview(self.effectView)
+            self.contentView.addSubview(self.stackView)
+            self.contentView.backgroundColor = .clear
+            container = self.contentView
+
+            NSLayoutConstraint.activate([
+                self.effectView.leadingAnchor.constraint(equalTo: self.contentView.leadingAnchor),
+                self.effectView.trailingAnchor.constraint(equalTo: self.contentView.trailingAnchor),
+                self.effectView.topAnchor.constraint(equalTo: self.contentView.topAnchor),
+                self.effectView.bottomAnchor.constraint(equalTo: self.contentView.bottomAnchor),
+            ])
+        }
+
         NSLayoutConstraint.activate([
-            self.contentView.leadingAnchor.constraint(equalTo: self.leadingAnchor),
-            self.contentView.trailingAnchor.constraint(equalTo: self.trailingAnchor),
-            self.contentView.topAnchor.constraint(equalTo: self.topAnchor),
-            self.contentView.bottomAnchor.constraint(equalTo: self.bottomAnchor),
+            container.leadingAnchor.constraint(equalTo: self.leadingAnchor),
+            container.trailingAnchor.constraint(equalTo: self.trailingAnchor),
+            container.topAnchor.constraint(equalTo: self.topAnchor),
+            container.bottomAnchor.constraint(equalTo: self.bottomAnchor),
 
-            self.effectView.leadingAnchor.constraint(equalTo: self.contentView.leadingAnchor),
-            self.effectView.trailingAnchor.constraint(equalTo: self.contentView.trailingAnchor),
-            self.effectView.topAnchor.constraint(equalTo: self.contentView.topAnchor),
-            self.effectView.bottomAnchor.constraint(equalTo: self.contentView.bottomAnchor),
-
-            self.stackView.leadingAnchor.constraint(equalTo: self.contentView.leadingAnchor, constant: 16),
-            self.stackView.trailingAnchor.constraint(equalTo: self.contentView.trailingAnchor, constant: -16),
-            self.stackView.topAnchor.constraint(equalTo: self.contentView.topAnchor, constant: 10),
-            self.stackView.bottomAnchor.constraint(equalTo: self.contentView.bottomAnchor, constant: -10),
+            self.stackView.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 16),
+            self.stackView.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -16),
+            self.stackView.topAnchor.constraint(equalTo: container.topAnchor, constant: 10),
+            self.stackView.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -10),
         ])
 
         self.alpha = 0
-        self.contentView.backgroundColor = .clear
 
         self.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.tapHandler)))
     }
