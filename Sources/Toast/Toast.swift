@@ -51,17 +51,6 @@ public final class Toast: UIView {
         }
     }
 
-    override public func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
-        super.traitCollectionDidChange(previousTraitCollection)
-
-        if self.traitCollection.horizontalSizeClass != previousTraitCollection?.horizontalSizeClass ||
-            self.traitCollection.verticalSizeClass != previousTraitCollection?.verticalSizeClass
-        {
-            self.updateConstraintsForCurrentSizeClass()
-            self.updateTabBarPositionForOrientation()
-        }
-    }
-
     public func setImage(imageName: String) {
         self.imageView.image = UIImage(systemName: imageName)
     }
@@ -78,16 +67,24 @@ public final class Toast: UIView {
     ///
     /// On iOS/tvOS 26+ the glass materializes by animating its effect, because fading
     /// the alpha of a glass view (or any of its superviews) renders it incorrectly.
+    /// The content is faded separately with `setContentVisible(_:)`.
     func setVisible(_ visible: Bool) {
         self.isVisible = visible
         self.isUserInteractionEnabled = visible
 
         if #available(iOS 26, tvOS 26, *) {
             self.effectView.effect = visible ? self.makeGlassEffect() : nil
-            self.stackView.alpha = visible ? 1 : 0
         }
         else {
             self.alpha = visible ? 1 : 0
+        }
+    }
+
+    /// Fades the icon and text on iOS/tvOS 26+, timed apart from the glass so they never
+    /// show without a backing. Earlier systems fade the whole toast in `setVisible(_:)`.
+    func setContentVisible(_ visible: Bool) {
+        if #available(iOS 26, tvOS 26, *) {
+            self.stackView.alpha = visible ? 1 : 0
         }
     }
 
@@ -248,7 +245,15 @@ public final class Toast: UIView {
         ])
 
         self.setVisible(false)
+        self.setContentVisible(false)
 
         self.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.tapHandler)))
+
+        self.registerForTraitChanges(
+            [UITraitHorizontalSizeClass.self, UITraitVerticalSizeClass.self]
+        ) { (toast: Toast, _: UITraitCollection) in
+            toast.updateConstraintsForCurrentSizeClass()
+            toast.updateTabBarPositionForOrientation()
+        }
     }
 }

@@ -21,7 +21,12 @@ public extension Toast {
             indefinite = 1000
     }
 
-    private static let animationTime: TimeInterval = 0.4
+    private static let showTime: TimeInterval = 0.3
+    private static let hideTime: TimeInterval = 0.4
+    /// The content fades in once the glass has mostly materialized, and fades out
+    /// before the glass dissolves.
+    private static let contentShowDelay: TimeInterval = 0.1
+    private static let contentHideTime: TimeInterval = 0.15
     /// How far the toast travels and how much it grows while appearing.
     /// Both are skipped when Reduce Motion is on, leaving only the fade/materialize.
     private static let travel: CGFloat = 24
@@ -42,17 +47,28 @@ public extension Toast {
         self.addTo(view, position: position)
 
         UIView.animate(
-            withDuration: Self.animationTime,
-            delay: 0,
-            options: .curveEaseOut,
+            springDuration: Self.showTime,
+            bounce: 0,
             animations: self.animationsForShow
+        )
+        UIView.animate(
+            withDuration: Self.showTime - Self.contentShowDelay,
+            delay: Self.contentShowDelay,
+            options: .curveEaseOut,
+            animations: { self.setContentVisible(true) }
         )
         return self
     }
 
     func hide(after delay: TimeInterval = .zero) {
         UIView.animate(
-            withDuration: Self.animationTime,
+            withDuration: Self.contentHideTime,
+            delay: delay,
+            options: .curveEaseIn,
+            animations: { self.setContentVisible(false) }
+        )
+        UIView.animate(
+            withDuration: Self.hideTime,
             delay: delay,
             options: [],
             animations: self.animationsForHide,
