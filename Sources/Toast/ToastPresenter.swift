@@ -22,7 +22,10 @@ public extension Toast {
     }
 
     private static let animationTime: TimeInterval = 0.4
-    private static let offScreenPosition: CGFloat = 160
+    /// How far the toast travels and how much it grows while appearing.
+    /// Both are skipped when Reduce Motion is on, leaving only the fade/materialize.
+    private static let travel: CGFloat = 24
+    private static let hiddenScale: CGFloat = 0.9
     private static let topMargin: CGFloat = 16
     private static let bottomMargin: CGFloat = 16
     private static let maxWidth: CGFloat = 500
@@ -87,17 +90,17 @@ public extension Toast {
         let positionConstraint: NSLayoutConstraint
         switch position {
         case .top:
-            positionConstraint = self.topAnchor.constraint(equalTo: parentView.safeAreaLayoutGuide.topAnchor, constant: -Self.offScreenPosition)
+            positionConstraint = self.topAnchor.constraint(equalTo: parentView.safeAreaLayoutGuide.topAnchor, constant: Self.hiddenOffset(for: position))
             self.isAnchoredToTabBar = false
         case .bottom:
             // Check if there's a tab bar to position above
             if let tabBar = TabBarFinder.findTabBar(in: parentView), tabBar.bounds.height > 0 {
                 // When showing above tab bar, anchor to the tab bar's top directly
-                positionConstraint = self.bottomAnchor.constraint(equalTo: tabBar.topAnchor, constant: Self.offScreenPosition)
+                positionConstraint = self.bottomAnchor.constraint(equalTo: tabBar.topAnchor, constant: Self.hiddenOffset(for: position))
                 self.isAnchoredToTabBar = true
             }
             else {
-                positionConstraint = self.bottomAnchor.constraint(equalTo: parentView.safeAreaLayoutGuide.bottomAnchor, constant: Self.offScreenPosition)
+                positionConstraint = self.bottomAnchor.constraint(equalTo: parentView.safeAreaLayoutGuide.bottomAnchor, constant: Self.hiddenOffset(for: position))
                 self.isAnchoredToTabBar = false
             }
         }
@@ -111,6 +114,7 @@ public extension Toast {
         self.updateConstraintsForCurrentSizeClass()
 
         parentView.layoutIfNeeded()
+        self.transform = Self.hiddenTransform
     }
 
     private func removeExistingToasts(from parentView: UIView) {
@@ -129,31 +133,40 @@ public extension Toast {
 
     private func animationsForShow() {
         self.setVisible(true)
+        self.transform = .identity
         guard let position = self.position else { return }
 
-        switch position {
-        case .top:
-            self.positionConstraint?.constant = Self.topMargin
-        case .bottom:
-            self.positionConstraint?.constant = -Self.bottomMargin
-        }
-
+        self.positionConstraint?.constant = Self.shownOffset(for: position)
         self.superview?.layoutIfNeeded()
     }
 
     private func animationsForHide() {
         self.setVisible(false)
+        self.transform = Self.hiddenTransform
         guard let position = self.position else { return }
 
-        switch position {
-        case .top:
-            self.positionConstraint?.constant = -Self.offScreenPosition
-        case .bottom:
-            // Move off screen below
-            self.positionConstraint?.constant = Self.offScreenPosition
-        }
-
+        self.positionConstraint?.constant = Self.hiddenOffset(for: position)
         self.superview?.layoutIfNeeded()
+    }
+
+    private static var hiddenTransform: CGAffineTransform {
+        UIAccessibility.isReduceMotionEnabled ? .identity : CGAffineTransform(scaleX: self.hiddenScale, y: self.hiddenScale)
+    }
+
+    private static func shownOffset(for position: Position) -> CGFloat {
+        switch position {
+        case .top: self.topMargin
+        case .bottom: -self.bottomMargin
+        }
+    }
+
+    /// Slightly short of the resting place, toward the edge the toast belongs to.
+    private static func hiddenOffset(for position: Position) -> CGFloat {
+        let travel = UIAccessibility.isReduceMotionEnabled ? 0 : self.travel
+        switch position {
+        case .top: return self.shownOffset(for: position) - travel
+        case .bottom: return self.shownOffset(for: position) + travel
+        }
     }
 }
 
