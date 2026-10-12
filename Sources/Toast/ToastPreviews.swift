@@ -6,57 +6,47 @@
 //
 
 #if DEBUG && os(iOS)
+// Not used directly, but the canvas fails with "no such module 'SwiftUI'" without it.
 import SwiftUI
 import UIKit
 
 #Preview("Top") {
-    ToastPreviewWrapper(
+    fillingCanvas(ToastPreviewView(
         text: "Operation completed successfully",
         imageName: "checkmark.circle.fill",
         color: .systemGreen.withAlphaComponent(0.4),
         withSpinner: false,
         position: .top
-    )
+    ))
 }
 
 #Preview("Bottom with Spinner") {
-    ToastPreviewWrapper(
+    fillingCanvas(ToastPreviewView(
         text: "Loading your data...",
         imageName: "arrow.triangle.2.circlepath",
         color: nil,
         withSpinner: true,
         position: .bottom
-    )
+    ))
 }
 
 #Preview("Long Text") {
-    ToastPreviewWrapper(
+    fillingCanvas(ToastPreviewView(
         text: "This is a longer message that demonstrates how the toast handles multiple lines of text content",
         imageName: "info.circle",
         color: nil,
         withSpinner: false,
         position: .top
-    )
+    ))
 }
 
-private struct ToastPreviewWrapper: UIViewRepresentable {
-    let text: String
-    let imageName: String
-    let color: UIColor?
-    let withSpinner: Bool
-    let position: Toast.Position
-
-    func makeUIView(context: Context) -> UIView {
-        ToastPreviewView(
-            text: self.text,
-            imageName: self.imageName,
-            color: self.color,
-            withSpinner: self.withSpinner,
-            position: self.position
-        )
-    }
-
-    func updateUIView(_ uiView: UIView, context: Context) {}
+/// Hosts the view as a view controller's root so it fills the canvas. A bare `UIView`
+/// preview is sized by Auto Layout, so it would shrink to the toast's width while one shows.
+@MainActor
+private func fillingCanvas(_ view: UIView) -> UIViewController {
+    let controller = UIViewController()
+    controller.view = view
+    return controller
 }
 
 /// Repeatedly shows and hides a toast through the real presenter, over a colorful
